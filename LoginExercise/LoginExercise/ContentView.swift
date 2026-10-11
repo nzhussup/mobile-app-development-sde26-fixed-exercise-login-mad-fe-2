@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct ContentView: View {
-    private let correctEmail = "student@example.com"
-    private let correctPassword = "password"
+
+    private let networking = NetworkingService()
 
     @State private var email = ""
     @State private var password = ""
@@ -93,30 +93,91 @@ struct ContentView: View {
         }
 
         guard !email.isEmpty else {
-            showLoginAlert(title: "Missing Email", message: "Please enter your email address.")
+            showLoginAlert(
+                title: "Missing Email",
+                message: "Please enter your email address."
+            )
             return
         }
 
         guard !password.isEmpty else {
-            showLoginAlert(title: "Missing Password", message: "Please enter your password.")
+            showLoginAlert(
+                title: "Missing Password",
+                message: "Please enter your password."
+            )
             return
         }
 
         isLoggingIn = true
         focusedField = nil
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        networking.login(
+            email: email,
+            password: password
+        ) { user, error in
+
             isLoggingIn = false
 
-            if email == correctEmail && password == correctPassword {
-                showLoginAlert(title: "Success", message: "You are logged in.")
+            if let error = error {
+                handleLoginError(error)
+                return
+            }
+
+            if let user = user {
+                print("Logged in user: \(user.email)")
+
+                showLoginAlert(
+                    title: "Success",
+                    message: "You are logged in as \(user.email)."
+                )
             } else {
-                showLoginAlert(title: "Login Failed", message: "Email or password is incorrect.")
+                showLoginAlert(
+                    title: "Login Failed",
+                    message: "An unexpected error occurred."
+                )
             }
         }
     }
 
-    private func showLoginAlert(title: String, message: String) {
+    private func handleLoginError(_ error: NetworkingError) {
+        let message: String
+
+        switch error {
+        case .serializationFailed:
+            message = "Failed to prepare the login request."
+
+        case .invalidEmail:
+            message = "Please enter a valid email address."
+
+        case .emailNotFound:
+            message = "No account exists with this email."
+
+        case .wrongPassword:
+            message = "The password is incorrect."
+
+        case .offline:
+            message = "No internet connection. Please try again."
+
+        case .invalidResponseFormat:
+            message = "Received an unexpected server response."
+
+        case .httpError(let statusCode):
+            message = "Server error (HTTP \(statusCode))."
+
+        case .unexpectedError(let description):
+            message = description
+        }
+
+        showLoginAlert(
+            title: "Login Failed",
+            message: message
+        )
+    }
+
+    private func showLoginAlert(
+        title: String,
+        message: String
+    ) {
         alertTitle = title
         alertMessage = message
         showAlert = true
